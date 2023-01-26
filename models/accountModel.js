@@ -7,7 +7,7 @@ const accountSchema = new Schema(
     name: { type: String, required: true },
     accounttype: { type: String, required: true },
     userID: {
-      type: Number,
+      type: String,
       required: true,
     },
     balance: {
@@ -15,7 +15,7 @@ const accountSchema = new Schema(
       required: true,
     },
     colorhex: {
-      type: Number,
+      type: String,
       required: true,
     },
   },

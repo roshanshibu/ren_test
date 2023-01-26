@@ -5,6 +5,9 @@ const bcrypt = require("bcryptjs")
 
 //GET all users
 const getUsers = async (req, res) => {
+  if(req.headers.jwt.userId != "insertadminid")
+    return res.status(401).json({ error: 'User Not Authorized' });
+  
   const users = await User.find({}).sort({ createdAt: -1 });
 
   res.status(200).json(users);
@@ -13,7 +16,7 @@ const getUsers = async (req, res) => {
 //GET a single user
 const getUser = async (req, res) => {
   const { id } = req.params;
-  if (id == req.headers.jwt.userId) {
+  if (id == req.headers.jwt.userId || req.headers.jwt.userId == "insertadminid") {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(404).json({ error: 'No such user' });
     }
@@ -44,7 +47,7 @@ const createUser = async (req, res) => {
   res.status(200).json(user);
   } catch (error) {
     console.log(error)
-    res.status(400).json({ error: error }); 
+    res.status(400).json({ error: error.message }); 
   }
 }
 
@@ -77,7 +80,7 @@ const authenticateUser = async (req, res) => {
     }
   } catch (error) {
     console.log(error)
-    res.status(400).json({ error: error }); 
+    res.status(400).json({ error: error.message }); 
   }
 }
   

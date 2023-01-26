@@ -1,11 +1,15 @@
 require('dotenv').config();
 
 const express = require('express');
+
 const transactionRoutes = require('./routes/transaction');
 const accountRoutes = require('./routes/account');
 const userRoutes = require('./routes/user');
+const categoryRoutes = require('./routes/category');
+
 const swaggerUI = require('swagger-ui-express');
 const swaggerJsDoc = require('swagger-jsdoc');
+const cors = require('cors')
 
 const swaggerOptions = {
     swaggerDefinition: {
@@ -28,6 +32,9 @@ const swaggerOptions = {
 
 const app = express();
 const port = process.env.PORT;
+
+//ENABLE CORS
+app.use(cors())
 
 //SWAGGER
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
@@ -58,3 +65,4 @@ mongoose.connect(process.env.MONGO_URI)
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/categories', categoryRoutes);

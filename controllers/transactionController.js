@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 
 //GET all transactions
 const getTransactions = async (req, res) => {
-  const transactions = await Transaction.find({}).sort({ createdAt: -1 });
+  const {accountID} = req.params;
+  const transactions = await Transaction.find({accountID: accountID}).sort({ createdAt: -1 });
 
   res.status(200).json(transactions);
 };
@@ -19,6 +20,9 @@ const getTransaction = async (req, res) => {
   if (!transaction) {
     return res.status(404).json({ error: 'No such transaction' });
   }
+
+  if(!transaction.userID == req.headers.jwt.userId) 
+  return res.status(404).json({ error: 'No such transaction' });
 
   res.status(200).json(transaction);
 };
@@ -39,7 +43,7 @@ const createTransaction = async (req, res) => {
   } catch (err) {
     if (err.name == 'ValidationError') handleValidationError(err, req.body);
 
-    res.status(400).json({ error: err.msg }); //error messages not working
+    res.status(400).json({ error: err.message }); //error messages not working
   }
 };
 
