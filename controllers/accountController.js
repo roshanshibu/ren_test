@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 //GET all accounts
 const getAccounts = async (req, res) => {
-  const accounts = await Account.find({userID: req.headers.jwt.userId}).sort({ createdAt: -1 });
+  const accounts = await Account.find({userID: req.headers.jwt.userId}).sort({ balance: -1 });
 
   res.status(200).json(accounts);
 };
@@ -30,7 +30,7 @@ const getAccount = async (req, res) => {
 const createAccount = async (req, res) => {
   const { name, accounttype, balance, colorhex } = req.body;
   const userID = req.headers.jwt.userId;
-  //add doc to db
+
   try {
     const account = await Account.create({
       name,
@@ -45,7 +45,7 @@ const createAccount = async (req, res) => {
   }
 };
 
-//DELETE a account
+//DELETE an account
 const deleteAccount = async (req, res) => {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -61,7 +61,7 @@ const deleteAccount = async (req, res) => {
   res.status(200).json(account);
 };
 
-//UPDATE a account
+//UPDATE an account
 const updateAccount = async (req, res) => {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -81,6 +81,18 @@ const updateAccount = async (req, res) => {
 
   res.status(200).json(account);
 };
+
+//Show all accounts pipeline
+Account.aggregate([
+  {
+    $project: {
+      _id: 0,
+      name: 1,
+      type: 1,
+      balance: 1,
+    },
+  },
+]);
 
 module.exports = {
   getAccounts,

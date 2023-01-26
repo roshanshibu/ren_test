@@ -8,6 +8,15 @@ const getCategories = async (req, res) => {
   res.status(200).json(categories);
 };
 
+//GET Categories by ctype
+const getCategoriesByType = async (req, res) => {
+  const { ctype } = req.params;
+
+  const categories = await Category.find({ctype: ctype}).sort({ createdAt: -1 })
+
+  res.status(200).json(categories);
+}
+
 //GET a single Category
 const getCategory = async (req, res) => {
   const { id } = req.params;
@@ -84,6 +93,7 @@ const updateCategory = async (req, res) => {
 
 module.exports = {
   getCategories,
+  getCategoriesByType,
   getCategory,
   createCategory,
   deleteCategory,

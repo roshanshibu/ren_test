@@ -6,6 +6,7 @@ const transactionRoutes = require('./routes/transaction');
 const accountRoutes = require('./routes/account');
 const userRoutes = require('./routes/user');
 const categoryRoutes = require('./routes/category');
+const dashboardRoutes = require('./routes/dashboard');
 
 const swaggerUI = require('swagger-ui-express');
 const swaggerJsDoc = require('swagger-jsdoc');
@@ -28,7 +29,6 @@ const swaggerOptions = {
     },
     apis: ["./routes/user.js" ],
   };
-  
 
 const app = express();
 const port = process.env.PORT;
@@ -66,3 +66,4 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/dashboard', dashboardRoutes);

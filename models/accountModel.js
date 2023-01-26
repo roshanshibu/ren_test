@@ -4,8 +4,8 @@ const Schema = mongoose.Schema;
 
 const accountSchema = new Schema(
   {
-    name: { type: String, required: true },
-    accounttype: { type: String, required: true },
+    name: { type: String, required: true, unique: true },
+    type: { type: String, required: true },
     userID: {
       type: String,
       required: true,
@@ -14,7 +14,7 @@ const accountSchema = new Schema(
       type: Number,
       required: true,
     },
-    colorhex: {
+    color: {
       type: String,
       required: true,
     },

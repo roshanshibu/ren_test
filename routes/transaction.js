@@ -6,9 +6,9 @@ const auth = require("../middleware/auth");
 const {
     getTransactions,
     getTransaction,
-    createTransaction,
+    checkTransactionCreation,
     deleteTransaction,
-    updateTransaction
+    updateTransaction,
 } = require('../controllers/transactionController')
 
 
@@ -24,7 +24,7 @@ router.get('/:accountID', getTransactions)
 router.get('/:accountID/:id', getTransaction)
 
 //POST a new transaction
-router.post('/', createTransaction)
+router.post('/', checkTransactionCreation)
 
 //DELETE a transaction
 router.delete('/:accountID/:id', deleteTransaction)

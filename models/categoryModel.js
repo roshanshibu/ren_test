@@ -2,11 +2,12 @@ const mongoose = require('mongoose');
 
 var categorySchema = new mongoose.Schema(
   {
-    ctype: { type: String },
-    cname: { type: String },
-    userID: { type: String },
-    iconID: { type: String },
-    colorhex: { type: String },
+    type: { type: String, required: true },
+    name: { type: String, required: true },
+    accountID: { type: String, required: true },
+    icon: { type: String, required: true },
+    amount: { type: Number, required: true },
+    color: { type: String, required: true },
   },
   { timestamps: true }
 );

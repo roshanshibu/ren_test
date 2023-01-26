@@ -8,19 +8,27 @@ const transactionSchema = new Schema(
       type: String,
       required: true,
     },
+    fromAccountID: {
+      type: String,
+      required: false,
+    },
     description: {
       type: String,
       required: true,
     },
     amount: {
-      type: String,
+      type: Number,
       required: true,
     },
     categoryID: {
       type: String,
+      required: false,
+    },
+    accountID: {
+      type: String,
       required: true,
     },
-    ttype: {
+    type: {
       type: String,
       required: true,
     },

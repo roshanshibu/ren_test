@@ -5,6 +5,7 @@ const auth = require("../middleware/auth");
 //import controller functions
 const {
     getCategories,
+    getCategoriesByType,
     getCategory,
     createCategory,
     deleteCategory,
