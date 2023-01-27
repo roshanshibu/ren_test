@@ -32,6 +32,21 @@ const getUser = async (req, res) => {
   }
 };
 
+//Function to generate JWT TOKEN
+function generateJwtToken(user) { 
+  const token = jwt.sign(
+    {
+      userId: user._id,
+      email: user.email,
+    },
+    process.env.SECRET,
+    {
+      expiresIn: "2h",
+    }
+  )  
+  return token
+} 
+
 
 //CREATE a user - SIGN UP
 const createUser = async (req, res) => {
@@ -43,8 +58,10 @@ const createUser = async (req, res) => {
       password: await bcrypt.hash(req.body.password,10),
       email,
       currency,
-  })
-  res.status(200).json(user);
+    })
+    console.log("logged in")
+    const token = generateJwtToken(user) 
+    res.status(200).json({token: token})
   } catch (error) {
     console.log(error)
     res.status(400).json({ error: error.message }); 
@@ -61,16 +78,7 @@ const authenticateUser = async (req, res) => {
     if (user) {
       if (await bcrypt.compare(req.body.password, user.password)){
         console.log("logged in");
-        const token = jwt.sign(
-            {
-              userId: user._id,
-              email: user.email,
-            },
-            process.env.SECRET,
-            {
-              expiresIn: "2h",
-            }
-        )
+        const token = generateJwtToken(user)
         res.status(200).json({token: token})
       } else{
         res.status(401).json({ error: "Incorrect Password" })
