@@ -12,7 +12,7 @@ const getCategories = async (req, res) => {
 const getCategoriesByType = async (req, res) => {
   const { ctype } = req.params;
 
-  const categories = await Category.find({ctype: ctype}).sort({ createdAt: -1 })
+  const categories = await Category.find({type: ctype});
 
   res.status(200).json(categories);
 }
