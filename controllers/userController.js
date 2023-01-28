@@ -5,9 +5,9 @@ const bcrypt = require("bcryptjs")
 
 //GET all users
 const getUsers = async (req, res) => {
-  if(req.headers.jwt.userId != "insertadminid")
+  if (req.headers.jwt.userId != "insertadminid")
     return res.status(401).json({ error: 'User Not Authorized' });
-  
+
   const users = await User.find({}).sort({ createdAt: -1 });
 
   res.status(200).json(users);
@@ -28,24 +28,9 @@ const getUser = async (req, res) => {
 
     res.status(200).json(user);
   } else {
-    return res.status(401).json({ error: 'User Not Authorized'})
+    return res.status(401).json({ error: 'User Not Authorized' })
   }
 };
-
-//Function to generate JWT TOKEN
-function generateJwtToken(user) { 
-  const token = jwt.sign(
-    {
-      userId: user._id,
-      email: user.email,
-    },
-    process.env.SECRET,
-    {
-      expiresIn: "2h",
-    }
-  )  
-  return token
-} 
 
 
 //CREATE a user - SIGN UP
@@ -55,16 +40,14 @@ const createUser = async (req, res) => {
     const user = await User.create({
       firstname,
       lastname,
-      password: await bcrypt.hash(req.body.password,10),
+      password: await bcrypt.hash(req.body.password, 10),
       email,
       currency,
     })
-    console.log("logged in")
-    const token = generateJwtToken(user) 
-    res.status(200).json({token: token})
+    res.status(200).json(user);
   } catch (error) {
     console.log(error)
-    res.status(400).json({ error: error.message }); 
+    res.status(400).json({ error: error.message });
   }
 }
 
@@ -76,11 +59,20 @@ const authenticateUser = async (req, res) => {
       email: req.body.email,
     })
     if (user) {
-      if (await bcrypt.compare(req.body.password, user.password)){
+      if (await bcrypt.compare(req.body.password, user.password)) {
         console.log("logged in");
-        const token = generateJwtToken(user)
-        res.status(200).json({token: token})
-      } else{
+        const token = jwt.sign(
+          {
+            userId: user._id,
+            email: user.email,
+          },
+          process.env.SECRET,
+          {
+            expiresIn: "2h",
+          }
+        )
+        res.status(200).json({ token: token })
+      } else {
         res.status(401).json({ error: "Incorrect Password" })
       }
     } else {
@@ -88,47 +80,55 @@ const authenticateUser = async (req, res) => {
     }
   } catch (error) {
     console.log(error)
-    res.status(400).json({ error: error.message }); 
+    res.status(400).json({ error: error.message });
   }
 }
-  
+
 
 
 //DELETE a user
 const deleteUser = async (req, res) => {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(404).json({ error: 'No such user' });
+  if (id == req.headers.jwt.userId || req.headers.jwt.userId == "insertadminid") {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ error: 'No such user' });
+    }
+
+    const user = await User.findOneAndDelete({ _id: id });
+
+    if (!user) {
+      return res.status(400).json({ error: 'No such user' });
+    }
+
+    res.status(200).json(user);
+  } else {
+    return res.status(401).json({ error: 'User Not Authorized' })
   }
-
-  const user = await User.findOneAndDelete({ _id: id });
-
-  if (!user) {
-    return res.status(400).json({ error: 'No such user' });
-  }
-
-  res.status(200).json(user);
 };
 
 //UPDATE a user
 const updateUser = async (req, res) => {
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(404).json({ error: 'No such user' });
-  }
-
-  const user = await User.findOneAndUpdate(
-    { _id: id },
-    {
-      ...req.body,
+  if (id == req.headers.jwt.userId || req.headers.jwt.userId == "insertadminid") {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ error: 'No such user' });
     }
-  );
 
-  if (!user) {
-    return res.status(400).json({ error: 'No such user' });
+    const user = await User.findOneAndUpdate(
+      { _id: id },
+      {
+        ...req.body,
+      }
+    );
+
+    if (!user) {
+      return res.status(400).json({ error: 'No such user' });
+    }
+
+    res.status(200).json(user);
+  } else {
+    return res.status(401).json({ error: 'User Not Authorized' })
   }
-
-  res.status(200).json(user);
 };
 
 module.exports = {

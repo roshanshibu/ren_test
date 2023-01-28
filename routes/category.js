@@ -21,9 +21,6 @@ router.use(auth)
 //GET all categories
 router.get('/', getCategories)
 
-//GET categories by type
-router.get('/type/:ctype', getCategoriesByType)
-
 //GET a single category
 router.get('/:id', getCategory)
 
