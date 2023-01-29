@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 //GET all accounts
 const getAccounts = async (req, res) => {
-  const accounts = await Account.find({ userID: req.headers.jwt.userId }).sort({ createdAt: 1 });
+  const accounts = await Account.find({userID: req.headers.jwt.userId}).sort({ balance: -1 });
 
   res.status(200).json(accounts);
 };
@@ -19,8 +19,8 @@ const getAccount = async (req, res) => {
   if (!account) {
     return res.status(404).json({ error: 'No such account' });
   }
-
-  if (account.userID != req.headers.jwt.userId) //if account does not belong to the user
+  
+  if(account.userID != req.headers.jwt.userId) //if account does not belong to the user
     return res.status(404).json({ error: 'No such account' });
 
   res.status(200).json(account);
@@ -28,16 +28,16 @@ const getAccount = async (req, res) => {
 
 //POST a new account
 const createAccount = async (req, res) => {
-  const { name, type, balance, color } = req.body;
+  const { name, accounttype, balance, colorhex } = req.body;
   const userID = req.headers.jwt.userId;
 
   try {
     const account = await Account.create({
       name,
-      type,
+      accounttype,
       userID,
       balance,
-      color,
+      colorhex,
     });
     res.status(200).json(account);
   } catch (error) {
@@ -48,46 +48,38 @@ const createAccount = async (req, res) => {
 //DELETE an account
 const deleteAccount = async (req, res) => {
   const { id } = req.params;
-  if (id == req.headers.jwt.userId || req.headers.jwt.userId == "insertadminid") {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({ error: 'No such account' });
-    }
-
-    const account = await Account.findOneAndDelete({ _id: id, userID: req.headers.jwt.userId });
-
-    if (!account) {
-      return res.status(400).json({ error: 'No such account' });
-    }
-
-    res.status(200).json(account);
-  } else {
-    return res.status(401).json({ error: 'User Not Authorized' })
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(404).json({ error: 'No such account' });
   }
+
+  const account = await Account.findOneAndDelete({ _id: id, userID: req.headers.jwt.userId });
+
+  if (!account) {
+    return res.status(400).json({ error: 'No such account' });
+  }
+
+  res.status(200).json(account);
 };
 
 //UPDATE an account
 const updateAccount = async (req, res) => {
   const { id } = req.params;
-  if (id == req.headers.jwt.userId || req.headers.jwt.userId == "insertadminid") {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({ error: 'No such account' });
-    }
-
-    const account = await Account.findOneAndUpdate(
-      { _id: id, userID: req.headers.jwt.userId },
-      {
-        ...req.body,
-      }
-    );
-
-    if (!account) {
-      return res.status(400).json({ error: 'No such account' });
-    }
-
-    res.status(200).json(account);
-  } else {
-    return res.status(401).json({ error: 'User Not Authorized' })
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(404).json({ error: 'No such account' });
   }
+
+  const account = await Account.findOneAndUpdate(
+    { _id: id, userID: req.headers.jwt.userId },
+    {
+      ...req.body,
+    }
+  );
+
+  if (!account) {
+    return res.status(400).json({ error: 'No such account' });
+  }
+
+  res.status(200).json(account);
 };
 
 //Show all accounts pipeline

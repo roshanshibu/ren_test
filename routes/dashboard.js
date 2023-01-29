@@ -1,6 +1,5 @@
 const { json } = require('express');
 const express = require('express');
-const auth = require("../middleware/auth");
 
 //import controller functions
 const {
@@ -9,9 +8,6 @@ const {
 
 
 const router = express.Router();
-
-//Call authorization middleware for all routes below
-router.use(auth)
 
 //GET dashboard values
 router.get('/', getDashboard)

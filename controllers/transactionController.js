@@ -30,7 +30,7 @@ const getTransaction = async (req, res) => {
 };
 
 const checkTransactionCreation = async (req, res) => {
-  if(req.body.type == "Transfer")
+  if(req.body.ttype == "Transfer")
     createTransfer(req, res);
   else
     createTransaction(req, res);
@@ -38,18 +38,15 @@ const checkTransactionCreation = async (req, res) => {
 
 //POST a new transaction
 const createTransaction = async (req, res) => {
-  const { accountID, description, amount, date, categoryID, type } = req.body;
-  const userID = req.headers.jwt.userId;
-
+  const { accountID, description, amount, categoryID, ttype } = req.body;
+  //add doc to db
   try {
     const transaction = await Transaction.create({
       accountID,
-      userID,
       description,
       amount,
-      date,
       categoryID,
-      type,
+      ttype,
     });
     if (categoryID == null)
       return res.status(400).json({ error: 'categoryID undefined' });
@@ -62,8 +59,7 @@ const createTransaction = async (req, res) => {
 
 const createTransfer = async (req, res) => { //POST
   //make new transaction with type transfer
-  const { accountID, fromAccountID, description, amount, date, type } = req.body;
-  const userID = req.headers.jwt.userId;
+  const { accountID, fromAccountID, description, amount, ttype } = req.body;
 
   //Check if accounts are valid
   if (!mongoose.Types.ObjectId.isValid(accountID) ||  !mongoose.Types.ObjectId.isValid(fromAccountID))
@@ -73,11 +69,9 @@ const createTransfer = async (req, res) => { //POST
     const transaction = await Transaction.create({
       accountID,
       fromAccountID,
-      userID,
       description,
       amount,
-      date,
-      type,
+      ttype,
     });
 
     //Update balance in specified accounts

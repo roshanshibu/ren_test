@@ -12,10 +12,6 @@ const transactionSchema = new Schema(
       type: String,
       required: false,
     },
-    userID: {
-      type: String,
-      required: true
-    },
     description: {
       type: String,
       required: true,
@@ -24,13 +20,13 @@ const transactionSchema = new Schema(
       type: Number,
       required: true,
     },
-    date: {
-      type: Date,
-      required: true,
-    },
     categoryID: {
       type: String,
       required: false,
+    },
+    accountID: {
+      type: String,
+      required: true,
     },
     type: {
       type: String,
