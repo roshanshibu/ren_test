@@ -3,19 +3,21 @@ const mongoose = require('mongoose');
 
 //GET all Categories
 const getCategories = async (req, res) => {
-  const categories = await Category.find({userID: req.headers.jwt.userId}).sort({ createdAt: -1 });
+  const categories = await Category.find({
+    userID: req.headers.jwt.userId,
+  }).sort({ createdAt: -1 });
 
   res.status(200).json(categories);
 };
 
-//GET Categories by ctype
+//GET Categories by type
 const getCategoriesByType = async (req, res) => {
-  const { ctype } = req.params;
+  const { type } = req.params;
 
-  const categories = await Category.find({type: ctype});
+  const categories = await Category.find({type: type});
 
   res.status(200).json(categories);
-}
+};
 
 //GET a single Category
 const getCategory = async (req, res) => {
@@ -30,23 +32,25 @@ const getCategory = async (req, res) => {
     return res.status(404).json({ error: 'No such Category' });
   }
 
-  if(category.userID != req.headers.jwt.userId) //if category does not belong to the user
-  return res.status(404).json({ error: 'No such Category' });
+  if (category.userID != req.headers.jwt.userId)
+    //if category does not belong to the user
+    return res.status(404).json({ error: 'No such Category' });
 
   res.status(200).json(category);
 };
 
 //POST a new Category
 const createCategory = async (req, res) => {
-  const { ctype, cname, iconID, colorhex } = req.body;
+  const { type, name, accountID, icon, color } = req.body;
   const userID = req.headers.jwt.userId;
   try {
     const category = await Category.create({
-      ctype,
-      cname,
+      type,
+      name,
+      accountID,
       userID,
-      iconID,
-      colorhex,
+      icon,
+      color,
     });
     res.status(200).json(category);
   } catch (error) {
@@ -61,7 +65,10 @@ const deleteCategory = async (req, res) => {
     return res.status(404).json({ error: 'No such Category' });
   }
 
-  const category = await Category.findOneAndDelete({ _id: id, userID: req.headers.jwt.userId });
+  const category = await Category.findOneAndDelete({
+    _id: id,
+    userID: req.headers.jwt.userId,
+  });
 
   if (!category) {
     return res.status(400).json({ error: 'No such Category' });

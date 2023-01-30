@@ -2,130 +2,256 @@ const Dashboard = require('../models/dashboardModel');
 const Transaction = require('../models/transactionModel');
 const Account = require('../models/accountModel');
 const Category = require('../models/categoryModel');
+const User = require('../models/userModel');
 
 const mongoose = require('mongoose');
+const { getTransactions } = require('./transactionController');
+const { json } = require('express');
 
 //GET dashboard
 const getDashboard = async (req, res) => {
-  const dashboard = await calcDashboard();
+  const dashboard = await calcDashboard(req.headers.jwt.userId);
 
   res.status(200).json(dashboard);
 };
 
-async function calcDashboard() {
+async function calcDashboard(UserID) {
   //Total Balance pipeline
+
   const agg1 = await Account.aggregate([
+    {
+      $match: { userID: { $eq: UserID } },
+    },
+    {
+      $addFields: { userID: { $toObjectId: '$userID' } },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'userID',
+        foreignField: '_id',
+        as: 'users',
+      },
+    },
+    {
+      $unwind: '$users',
+    },
     {
       $group: {
         _id: null,
         totalBalance: { $sum: '$balance' },
-      },
-    },
-  ]);
-
-  //total income and total expense pipeline
-  const agg2 = await Category.aggregate([
-    {
-      $match: {
-        createdAt: {
-          $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-          $lt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
-        },
-      },
-    },
-    {
-      $group: {
-        _id: '$type',
-        totalAmount: { $sum: '$amount' },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        type: '$_id',
-        totalAmount: 1,
-      },
-    },
-  ]);
-
-  //top3Categories with others pipeline
-  const agg3 = await Category.aggregate([
-    {
-      $match: {
-        type: 'expense',
+        currency: { $first: '$users.currency' },
       },
     },
     // {
-    //   $group: {
-    //     _id: '$name',
-    //     amount: { $sum: '$amount' },
+    //   $project: {
+    //     totalBalance: '$totalBalance',
+    //     currency: '$currency',
     //   },
     // },
+  ]);
+
+  //total income and total expense pipeline
+  const agg2 = await // Aggregation pipeline for total income
+  Transaction.aggregate([
     {
-      $group: {
-        _id: null,
-        totalExpense: { $sum: '$amount' },
-        categories: {
-          $push: {
-            name: '$name',
-            amount: '$amount',
-            icon: '$icon',
-            color: '$color'
-          },
-        },
-      },
+      $match: { userID: { $eq: UserID }, type: 'Income' },
     },
     {
-      $project: {
-        _id: 0,
-        categories: {
-          $map: {
-            input: '$categories',
-            as: 'category',
-            in: {
-              name: '$$category.name',
-              percent: { $round: { $multiply: [{ $divide: ['$$category.amount', '$totalExpense'] }, 100] } },
-              icon: '$$category.icon',
-              color: '$$category.color'
-            },
-          },
-        },
-      },
-    },
-    {
-      $unwind: '$categories',
-    },
-    {
-      $sort: { 'categories.percent': -1 },
-    },
-    {
-      $group: {
-        _id: null,
-        categories: { $push: '$categories' },
-      },
-    },
-    {
-      $project: {
-        first: { $arrayElemAt: [{ $slice: ['$categories', 0, 1] }, 0] },
-        second: { $arrayElemAt: [{ $slice: ['$categories', 1, 1] }, 0] },
-        third: { $arrayElemAt: [{ $slice: ['$categories', 2, 1] }, 0] },
-        others: {
-          $subtract: [
-            100,
+      $match: {
+        $expr: {
+          $and: [
             {
-              $sum: [
-                { $arrayElemAt: ['$categories.percent', 0] },
-                { $arrayElemAt: ['$categories.percent', 1] },
-                { $arrayElemAt: ['$categories.percent', 2] },
+              $gte: [
+                '$createdAt',
+                new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+              ],
+            },
+            {
+              $lt: [
+                '$createdAt',
+                new Date(
+                  new Date().getFullYear(),
+                  new Date().getMonth() + 1,
+                  1
+                ),
               ],
             },
           ],
         },
       },
     },
+    {
+      $group: {
+        _id: null,
+        totalIncome: { $sum: '$amount' },
+      },
+    },
   ]);
 
-  const res = [agg1,agg2,agg3]
+  // Aggregation pipeline for total expenses
+  const agg3 = await Transaction.aggregate([
+    {
+      $match: { userID: { $eq: UserID }, type: 'Expense' },
+    },
+    {
+      $match: {
+        $expr: {
+          $and: [
+            {
+              $gte: [
+                '$createdAt',
+                new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+              ],
+            },
+            {
+              $lt: [
+                '$createdAt',
+                new Date(
+                  new Date().getFullYear(),
+                  new Date().getMonth() + 1,
+                  1
+                ),
+              ],
+            },
+          ],
+        },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalExpense: { $sum: '$amount' },
+      },
+    },
+  ]);
+
+  //top3Categories with others pipeline
+  const agg4 = await Transaction.aggregate([
+    {
+      $match: {
+        userID: { $eq: UserID },
+        type: 'Expense',
+      },
+    },
+    {
+      $addFields: { categoryID: { $toObjectId: '$categoryID' } },
+    },
+    {
+      $lookup: {
+        from: 'categories',
+        localField: 'categoryID',
+        foreignField: '_id',
+        as: 'category_info',
+      },
+    },
+    {
+      $unwind: '$category_info',
+    },
+    {
+      $group: {
+        _id: '$category_info.name',
+        amount: { $sum: '$amount' },
+      },
+    },
+    {
+      $sort: {
+        amount: -1,
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: '$amount' },
+        data: { $push: '$$ROOT' },
+      },
+    },
+    {
+      $project: {
+        results: {
+          $map: {
+            input: {
+              $slice: ['$data', 3],
+            },
+            in: {
+              rank: {
+                $switch: {
+                  branches: [
+                    {
+                      case: {
+                        $eq: [{ $indexOfArray: ['$data', '$$this'] }, 0],
+                      },
+                      then: 'first',
+                    },
+                    {
+                      case: {
+                        $eq: [{ $indexOfArray: ['$data', '$$this'] }, 1],
+                      },
+                      then: 'second',
+                    },
+                    {
+                      case: {
+                        $eq: [{ $indexOfArray: ['$data', '$$this'] }, 2],
+                      },
+                      then: 'third',
+                    },
+                  ],
+                  default: '',
+                },
+              },
+              category: '$$this._id',
+              percentage: {
+                $round: {
+                  $multiply: [{ $divide: ['$$this.amount', '$total'] }, 100],
+                },
+              },
+            },
+          },
+        },
+        others: {
+          $cond: {
+            if: { $gt: [{ $size: '$data' }, 3] },
+            then: {
+              amount: {
+                $subtract: [
+                  '$total',
+                  {
+                    $sum: {
+                      $slice: ['$data.amount', 3],
+                    },
+                  },
+                ],
+              },
+              percentage: {
+                $round: {
+                  $multiply: [
+                    {
+                      $divide: [
+                        {
+                          $subtract: [
+                            '$total',
+                            { $sum: { $slice: ['$data.amount', 3] } },
+                          ],
+                        },
+                        '$total',
+                      ],
+                    },
+                    100,
+                  ],
+                },
+              },
+            },
+            else: {
+              amount: null,
+              percentage: null,
+            },
+          },
+        },
+      },
+    },
+  ]);
+
+  const res = [agg1, agg2, agg3, agg4];
 
   return res;
 }

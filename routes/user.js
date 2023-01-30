@@ -7,6 +7,7 @@ const {
     getUsers,
     getUser,
     createUser,
+    authorizeOauth2User,
     authenticateUser,
     deleteUser,
     updateUser
@@ -115,6 +116,9 @@ router.post('/', createUser)
  */
 //AUTHENTICATE a user - LOGIN
 router.post('/auth', authenticateUser)
+
+//CREATE a user if not registered - on Oauth2 login
+router.post('/oauthlogin', authorizeOauth2User)
 
 //Call authorization middleware for all routes below
 router.use(auth)
