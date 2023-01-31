@@ -317,6 +317,17 @@ const createTransaction = async (req, res) => {
       categoryID,
       type,
     });
+
+    const account = await Account.findById(accountID);
+    const account_newBalance = +account.balance - +amount;
+
+    await Account.findOneAndUpdate(
+      { _id: accountID },
+      {
+        balance: account_newBalance,
+      }
+    );
+
     if (categoryID == null)
       return res.status(400).json({ error: 'categoryID undefined' });
 
