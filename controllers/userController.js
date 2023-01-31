@@ -16,22 +16,19 @@ const getUsers = async (req, res) => {
   res.status(200).json(users);
 };
 
-//GET a single user
+//GET a single User Profile
 const getUser = async (req, res) => {
-  const { id } = req.params;
-  if (id == req.headers.jwt.userId || req.headers.jwt.userId == "insertadminid") {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({ error: 'No such user' });
-    }
 
-    const user = await User.findById(id);
-    if (!user) {
-      return res.status(404).json({ error: 'No such user' });
-    }
+  const id = req.headers.jwt.userId
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(404).json({ error: 'No such user' });
+  }
+  try {
+    const user = await User.findById(id)
+    res.status(200).json(user)
+  } catch(error) {
+    res.status(404).json({ error: error })
 
-    res.status(200).json(user);
-  } else {
-    return res.status(401).json({ error: 'User Not Authorized' })
   }
 };
 
@@ -170,26 +167,27 @@ const deleteUser = async (req, res) => {
 
 //UPDATE a user
 const updateUser = async (req, res) => {
-  const { id } = req.params;
-  if (id == req.headers.jwt.userId || req.headers.jwt.userId == "insertadminid") {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({ error: 'No such user' });
-    }
+
+  const id = req.headers.jwt.userId
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(404).json({ error: 'No such user' });
+  }
+  try {
 
     const user = await User.findOneAndUpdate(
       { _id: id },
       {
         ...req.body,
+
+      },
+      {
+        new: true
       }
-    );
-
-    if (!user) {
-      return res.status(400).json({ error: 'No such user' });
-    }
-
+    )
     res.status(200).json(user);
-  } else {
-    return res.status(401).json({ error: 'User Not Authorized' })
+  } catch(error) {
+    return res.status(400).json({ error: error })
+
   }
 };
 

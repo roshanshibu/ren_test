@@ -126,13 +126,13 @@ router.use(auth)
 //GET all users
 router.get('/', getUsers)
 
-//GET a single user
-router.get('/:id', getUser)
+//GET a single user profile
+router.get('/profile', getUser)
 
 //DELETE a user
 router.delete('/:id', deleteUser)
 
 //UPDATE a user
-router.patch('/:id', updateUser)
+router.patch('/', updateUser)
 
 module.exports = router;
