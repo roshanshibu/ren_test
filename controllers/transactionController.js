@@ -11,9 +11,175 @@ const getTransactions = async (req, res) => {
   //   createdAt: -1,
   const transactions = await calcTransactions(req.headers.jwt.userId);
 
-  res.status(200).json(transactions);
+  let result = [];
+
+  //unpacks arrays
+  transactions.forEach((element) => {
+    element.forEach((item) => {
+      result.push(item);
+    });
+  });
+
+  //renames "transactions" to date value
+  result = result.map(obj => {
+    if (obj.hasOwnProperty("transactions")) {
+      const { transactions, ...rest } = obj;
+      const newObj = { [obj._id]: transactions, ...rest };
+      delete newObj._id;
+      return newObj;
+    }
+    return obj;
+  });
+
+  //merge objects into one
+  result = Object.assign({}, ...result)
+
+  res.status(200).json(result);
 };
 
+const getSpecificTransactions = async (req, res) => {
+  const year = req.params.year;
+  const month = req.params.month;
+  const specTransactions = await calcspecTransactions(
+    req.headers.jwt.userId,
+    year,
+    month
+  );
+
+  let result = [];
+
+  //unpacks arrays
+  specTransactions.forEach((element) => {
+    element.forEach((item) => {
+      result.push(item);
+    });
+  });
+
+  //renames "transactions" to date value
+  result = result.map(obj => {
+    if (obj.hasOwnProperty("transactions")) {
+      const { transactions, ...rest } = obj;
+      const newObj = { [obj._id]: transactions, ...rest };
+      delete newObj._id;
+      return newObj;
+    }
+    return obj;
+  });
+
+  //merge objects into one
+  result = Object.assign({}, ...result)
+
+  res.status(200).json(result);
+};
+
+//specific Transaction by year and month
+async function calcspecTransactions(UserID, year, month) {
+  //pipeline for currency
+
+  const query = {
+    userID: UserID,
+  };
+  const agg1 = await User.aggregate([
+    {
+      $addFields: {
+        userID: { $toString: '$_id' },
+      },
+    },
+    {
+      $match: query,
+    },
+    {
+      $project: {
+        _id: 0,
+        currency: 1,
+      },
+    },
+  ]);
+  //pipeline for transactions
+  const agg2 = await Transaction.aggregate([
+    {
+      $match: {
+        userID: { $eq: UserID },
+        date: {
+          $gte: new Date(`${year}-${month}-01`),
+          $lt: new Date(`${year}-${parseInt(month, 10) + 1}-01`),
+        },
+      },
+    },
+    {
+      $addFields: {
+        categoryID: { $toObjectId: '$categoryID' },
+        accountID: { $toObjectId: '$accountID' },
+        date: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
+      },
+    },
+    {
+      $lookup: {
+        from: 'accounts',
+        localField: 'accountID',
+        foreignField: '_id',
+        as: 'account',
+      },
+    },
+    {
+      $lookup: {
+        from: 'categories',
+        localField: 'categoryID',
+        foreignField: '_id',
+        as: 'category',
+      },
+    },
+    {
+      $group: {
+        _id: '$date',
+        transactions: { $push: '$$ROOT' },
+      },
+    },
+    {
+      $sort: { _id: -1 },
+    },
+    {
+      $project: {
+        _id: 1,
+        transactions: {
+          $map: {
+            input: '$transactions',
+            as: 'transaction',
+            in: {
+              description: '$$transaction.description',
+              amount: '$$transaction.amount',
+              account: {
+                name: {
+                  $arrayElemAt: ['$$transaction.account.name', 0],
+                },
+              },
+              category: {
+                name: {
+                  $arrayElemAt: ['$$transaction.category.name', 0],
+                },
+                icon: {
+                  $arrayElemAt: ['$$transaction.category.icon', 0],
+                },
+                color: {
+                  $arrayElemAt: ['$$transaction.category.color', 0],
+                },
+                type: {
+                  $arrayElemAt: ['$$transaction.category.type', 0],
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  ]);
+
+  const res = [agg1, agg2];
+
+  return res;
+}
+
+//all Transactions
 async function calcTransactions(UserID) {
   //pipeline for currency
   const agg1 = await User.aggregate([
@@ -27,6 +193,7 @@ async function calcTransactions(UserID) {
     },
     {
       $project: {
+        _id: 0,
         currency: 1,
       },
     },
@@ -77,46 +244,26 @@ async function calcTransactions(UserID) {
             input: '$transactions',
             as: 'transaction',
             in: {
-              id: '$$transaction._id',
               description: '$$transaction.description',
               amount: '$$transaction.amount',
-              type: '$$transaction.type',
-              // date: '$$transaction.date',
               account: {
-                $mergeObjects: [
-                  { $arrayElemAt: ['$$transaction.account', 0] },
-                  {
-                    $let: {
-                      vars: {
-                        name: {
-                          $arrayElemAt: ['$$transaction.account.name', 0],
-                        },
-                      },
-                      in: { name: '$name' },
-                    },
-                  },
-                ],
+                name: {
+                  $arrayElemAt: ['$$transaction.account.name', 0],
+                },
               },
               category: {
-                $mergeObjects: [
-                  { $arrayElemAt: ['$$transaction.category', 0] },
-                  {
-                    $let: {
-                      vars: {
-                        name: {
-                          $arrayElemAt: ['$$transaction.category.name', 0],
-                        },
-                        icon: {
-                          $arrayElemAt: ['$$transaction.category.icon', 0],
-                        },
-                        color: {
-                          $arrayElemAt: ['$$transaction.category.color', 0],
-                        },
-                      },
-                      in: { name: '$name', icon: '$icon', color: '$color' },
-                    },
-                  },
-                ],
+                name: {
+                  $arrayElemAt: ['$$transaction.category.name', 0],
+                },
+                icon: {
+                  $arrayElemAt: ['$$transaction.category.icon', 0],
+                },
+                color: {
+                  $arrayElemAt: ['$$transaction.category.color', 0],
+                },
+                type: {
+                  $arrayElemAt: ['$$transaction.category.type', 0],
+                },
               },
             },
           },
@@ -340,6 +487,7 @@ const updateTransaction = async (req, res) => {
 // ]);
 
 module.exports = {
+  getSpecificTransactions,
   getTransactions,
   getTransaction,
   checkTransactionCreation,

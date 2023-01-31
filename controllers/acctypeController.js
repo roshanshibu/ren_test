@@ -30,7 +30,7 @@ const createAcctype = async (req, res) => {
     const acctype = await Acctype.create({ type });
     res.status(200).json(acctype);
   } catch (error) {
-    res.status(400).json({ error: error.msg }); //error messages not working
+    res.status(400).json({ error: error.message });
   }
 };
 

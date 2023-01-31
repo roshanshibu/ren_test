@@ -10,7 +10,22 @@ const { json } = require('express');
 
 //GET dashboard
 const getDashboard = async (req, res) => {
-  const dashboard = await calcDashboard(req.headers.jwt.userId);
+  const dashboard_temp = await calcDashboard(req.headers.jwt.userId);
+
+  //reduce currency, totalBalance, totalIncome & totalExpense into single array
+  var dashboard = dashboard_temp.slice(0, 3).reduce(function (acc, curr) {
+    if (curr && curr[0]) {
+      Object.keys(curr[0]).forEach(function (key) {
+        if (key !== "_id") {
+          acc[key] = curr[0][key];
+        }
+      });
+    }
+    return acc;
+  }, {});
+  //add results array to dashboard
+  if (dashboard_temp[3].length > 0)
+    dashboard.top3Categories = dashboard_temp[3];
 
   res.status(200).json(dashboard);
 };
@@ -39,8 +54,8 @@ async function calcDashboard(UserID) {
     {
       $group: {
         _id: null,
-        totalBalance: { $sum: '$balance' },
         currency: { $first: '$users.currency' },
+        totalBalance: { $sum: '$balance' },
       },
     },
     // {
@@ -53,41 +68,41 @@ async function calcDashboard(UserID) {
 
   //total income and total expense pipeline
   const agg2 = await // Aggregation pipeline for total income
-  Transaction.aggregate([
-    {
-      $match: { userID: { $eq: UserID }, type: 'Income' },
-    },
-    {
-      $match: {
-        $expr: {
-          $and: [
-            {
-              $gte: [
-                '$createdAt',
-                new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-              ],
-            },
-            {
-              $lt: [
-                '$createdAt',
-                new Date(
-                  new Date().getFullYear(),
-                  new Date().getMonth() + 1,
-                  1
-                ),
-              ],
-            },
-          ],
+    Transaction.aggregate([
+      {
+        $match: { userID: { $eq: UserID }, type: 'Income' },
+      },
+      {
+        $match: {
+          $expr: {
+            $and: [
+              {
+                $gte: [
+                  '$createdAt',
+                  new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+                ],
+              },
+              {
+                $lt: [
+                  '$createdAt',
+                  new Date(
+                    new Date().getFullYear(),
+                    new Date().getMonth() + 1,
+                    1
+                  ),
+                ],
+              },
+            ],
+          },
         },
       },
-    },
-    {
-      $group: {
-        _id: null,
-        totalIncome: { $sum: '$amount' },
+      {
+        $group: {
+          _id: null,
+          totalIncome: { $sum: '$amount' },
+        },
       },
-    },
-  ]);
+    ]);
 
   // Aggregation pipeline for total expenses
   const agg3 = await Transaction.aggregate([
@@ -127,7 +142,7 @@ async function calcDashboard(UserID) {
   ]);
 
   //top3Categories with others pipeline
-  const agg4 = await Transaction.aggregate([
+  var agg4 = await Transaction.aggregate([
     {
       $match: {
         userID: { $eq: UserID },
@@ -151,6 +166,8 @@ async function calcDashboard(UserID) {
     {
       $group: {
         _id: '$category_info.name',
+        icon: { $first: '$category_info.icon' },
+        color: { $first: '$category_info.color' },
         amount: { $sum: '$amount' },
       },
     },
@@ -174,7 +191,7 @@ async function calcDashboard(UserID) {
               $slice: ['$data', 3],
             },
             in: {
-              rank: {
+              Rank: {
                 $switch: {
                   branches: [
                     {
@@ -199,8 +216,10 @@ async function calcDashboard(UserID) {
                   default: '',
                 },
               },
-              category: '$$this._id',
-              percentage: {
+              Name: '$$this._id',
+              Icon: '$$this.icon',
+              Color: '$$this.color',
+              Percentage: {
                 $round: {
                   $multiply: [{ $divide: ['$$this.amount', '$total'] }, 100],
                 },
@@ -208,11 +227,12 @@ async function calcDashboard(UserID) {
             },
           },
         },
-        others: {
+        Others: {
           $cond: {
             if: { $gt: [{ $size: '$data' }, 3] },
             then: {
-              amount: {
+              Name: 'Others',
+              Amount: {
                 $subtract: [
                   '$total',
                   {
@@ -222,7 +242,7 @@ async function calcDashboard(UserID) {
                   },
                 ],
               },
-              percentage: {
+              Percentage: {
                 $round: {
                   $multiply: [
                     {
@@ -240,10 +260,12 @@ async function calcDashboard(UserID) {
                   ],
                 },
               },
+              Icon: 'others',
+              Color: '#26a69a'
             },
             else: {
-              amount: null,
-              percentage: null,
+              Amount: null,
+              Percentage: null,
             },
           },
         },
@@ -251,8 +273,15 @@ async function calcDashboard(UserID) {
     },
   ]);
 
-  const res = [agg1, agg2, agg3, agg4];
+  if (agg4.length > 0) {
+    const agg5 = agg4[0].results;
+    agg5.push(agg4[0].Others);
 
+    const res = [agg1, agg2, agg3, agg5];
+    return res;
+  }
+
+  const res = [agg1, agg2, agg3, agg4];
   return res;
 }
 

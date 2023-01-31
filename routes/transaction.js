@@ -4,6 +4,7 @@ const auth = require('../middleware/auth');
 
 //import controller functions
 const {
+  getSpecificTransactions,
   getTransactions,
   getTransaction,
   checkTransactionCreation,
@@ -18,6 +19,9 @@ router.use(auth);
 
 //GET all transactions
 router.get('/', getTransactions);
+
+//GET specific transactions
+router.get('/:year/:month', getSpecificTransactions);
 
 //GET a single transaction
 router.get('/:id', getTransaction);

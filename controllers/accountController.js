@@ -34,7 +34,7 @@ async function calcAccounts(UserID) {
     },
     {
       $project: {
-        _id: 0,
+        _id: 1,
         name: 1,
         type: 1,
         balance: 1,
