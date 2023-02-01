@@ -23,11 +23,14 @@ const getAcctype = async (req, res) => {
   res.status(200).json(acctype);
 };
 
-//POST a new acctype
+//PUT a new acctype
 const createAcctype = async (req, res) => {
   const { type } = req.body;
   try {
-    const acctype = await Acctype.create({ type });
+    let acctype = await Acctype.findOne({ type });
+    if (!acctype) {
+      acctype = await Acctype.create({ type });
+    }
     res.status(200).json(acctype);
   } catch (error) {
     res.status(400).json({ error: error.message });

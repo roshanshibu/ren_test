@@ -6,6 +6,7 @@ const auth = require("../middleware/auth");
 const {
     getAccounts,
     getAccount,
+    getAccountsPagination,
     createAccount,
     deleteAccount,
     updateAccount
@@ -23,8 +24,11 @@ router.get('/', getAccounts)
 //GET a single account
 router.get('/:id', getAccount)
 
-//POST a new account
-router.post('/', createAccount)
+//GET accounts with pagination
+router.get('/:page/:limit', getAccountsPagination)
+
+//PUT a new account (idempotent)
+router.put('/', createAccount)
 
 //DELETE a account
 router.delete('/:id', deleteAccount)

@@ -3,11 +3,43 @@ const mongoose = require('mongoose');
 
 //GET all Categories
 const getCategories = async (req, res) => {
-  const categories = await Category.find({
-    userID: req.headers.jwt.userId,
-  }).sort({ createdAt: -1 });
+
+  const type = req.query.type;
+  const name = req.query.name;
+
+  const query = {};
+  query.userID = req.headers.jwt.userId;
+  if (type) query.type = type;
+  if (name) query.name = name;
+
+  const categories = await Category.find(query).sort({ createdAt: -1 });
 
   res.status(200).json(categories);
+};
+
+const getCategoriesPagination = async (req, res) => {
+  const page = parseInt(req.params.page) || 1;
+  const limit = parseInt(req.params.limit) || 10;
+
+  const categories = await Category.find({
+    userID: req.headers.jwt.userId,
+  })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .sort({ createdAt: -1 });
+
+  const totalCategories = await Category.countDocuments({
+    userID: req.headers.jwt.userId,
+  });
+
+  const pagination = {
+    currentPage: page,
+    itemsPerPage: limit,
+    totalPages: Math.ceil(totalCategories / limit),
+    totalItems: totalCategories,
+  };
+
+  res.status(200).json({ categories, pagination });
 };
 
 //GET Categories by type
@@ -39,19 +71,25 @@ const getCategory = async (req, res) => {
   res.status(200).json(category);
 };
 
-//POST a new Category
+//PUT a new Category
 const createCategory = async (req, res) => {
   const { type, name, accountID, icon, color } = req.body;
   const userID = req.headers.jwt.userId;
   try {
-    const category = await Category.create({
-      type,
+    let category = await Category.findOne({
       name,
-      accountID,
       userID,
-      icon,
-      color,
     });
+    if (!category) {
+      category = await Category.create({
+        type,
+        name,
+        accountID,
+        userID,
+        icon,
+        color,
+      });
+    }
     res.status(200).json(category);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -100,6 +138,7 @@ const updateCategory = async (req, res) => {
 
 module.exports = {
   getCategories,
+  getCategoriesPagination,
   getCategoriesByType,
   getCategory,
   createCategory,

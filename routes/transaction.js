@@ -7,6 +7,7 @@ const {
   getSpecificTransactions,
   getTransactions,
   getTransaction,
+  getTransactionsPagination,
   checkTransactionCreation,
   deleteTransaction,
   updateTransaction,
@@ -23,11 +24,14 @@ router.get('/', getTransactions);
 //GET specific transactions
 router.get('/:year/:month', getSpecificTransactions);
 
+//GET transactions with pagination
+router.get('/:page/:limit', getTransactionsPagination);
+
 //GET a single transaction
 router.get('/:id', getTransaction);
 
-//POST a new transaction
-router.post('/', checkTransactionCreation);
+//PUT a new transaction
+router.put('/', checkTransactionCreation);
 
 //DELETE a transaction
 router.delete('/:id', deleteTransaction);

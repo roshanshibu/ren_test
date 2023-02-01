@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken')
 const jwt_decode = require("jwt-decode")
 const bcrypt = require("bcryptjs")
-const {OAuth2Client} = require('google-auth-library')
+const { OAuth2Client } = require('google-auth-library')
 const client = new OAuth2Client(process.env.CLIENT_ID);
 
 //GET all users
@@ -11,7 +11,16 @@ const getUsers = async (req, res) => {
   if (req.headers.jwt.userId != "insertadminid")
     return res.status(401).json({ error: 'User Not Authorized' });
 
-  const users = await User.find({}).sort({ createdAt: -1 });
+  const email = req.query.email;
+  const firstname = req.query.firstname;
+  const lastname = req.query.lastname;
+
+  const query = {};
+  if (email) query.email = email;
+  if (firstname) query.firstname = firstname;
+  if (lastname) query.lastname = lastname;
+
+  const users = await User.find(query).sort({ createdAt: -1 });
 
   res.status(200).json(users);
 };
@@ -26,14 +35,42 @@ const getUser = async (req, res) => {
   try {
     const user = await User.findById(id)
     res.status(200).json(user)
-  } catch(error) {
+  } catch (error) {
     res.status(404).json({ error: error })
 
   }
 };
 
+const getUsersPagination = async (req, res) => {
+  const page = parseInt(req.params.page) || 1;
+  const limit = parseInt(req.params.limit) || 10;
+
+  if (req.headers.jwt.userId != "insertadminid")
+  return res.status(401).json({ error: 'User Not Authorized' });
+
+  const users = await User.find({
+    userID: req.headers.jwt.userId,
+  })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .sort({ createdAt: -1 });
+
+  const totalUsers = await User.countDocuments({
+    userID: req.headers.jwt.userId,
+  });
+
+  const pagination = {
+    currentPage: page,
+    itemsPerPage: limit,
+    totalPages: Math.ceil(totalUsers / limit),
+    totalItems: totalUsers,
+  };
+
+  res.status(200).json({ users, pagination });
+};
+
 //Function to generate JWT TOKEN
-function generateJwtToken(user) { 
+function generateJwtToken(user) {
   const token = jwt.sign(
     {
       userId: user._id,
@@ -43,9 +80,9 @@ function generateJwtToken(user) {
     {
       expiresIn: "2h",
     }
-  )  
+  )
   return token
-} 
+}
 
 // Function to verify OAuth2 Token
 async function verify(token) {
@@ -55,9 +92,9 @@ async function verify(token) {
       audience: process.env.CLIENT_ID,
     });
     return true
-  } catch(error) {
-    return false; 
-  } 
+  } catch (error) {
+    return false;
+  }
 }
 
 
@@ -65,16 +102,21 @@ async function verify(token) {
 const createUser = async (req, res) => {
   const { firstname, lastname, password, email, currency } = req.body;
   try {
-    const user = await User.create({
-      firstname,
-      lastname,
-      password: await bcrypt.hash(req.body.password, 10),
-      email,
-      currency,
-    })
+    let user = await User.findOne({
+      email
+    });
+    if (!user) {
+      user = await User.create({
+        firstname,
+        lastname,
+        password: await bcrypt.hash(req.body.password, 10),
+        email,
+        currency,
+      })
+    }
     console.log("logged in")
-    const token = generateJwtToken(user) 
-    res.status(200).json({token: token})
+    const token = generateJwtToken(user)
+    res.status(200).json({ token: token })
   } catch (error) {
     console.log(error)
     res.status(400).json({ error: error.message });
@@ -88,12 +130,12 @@ const authorizeOauth2User = async (req, res) => {
     if (await verify(token)) {
       const decoded = jwt_decode(token)
       const fetchedUser = await User.findOne({
-      email: decoded.email,
+        email: decoded.email,
       })
       if (fetchedUser) {
         console.log("logged in")
         const generatedToken = generateJwtToken(fetchedUser)
-        res.status(200).json({token: generatedToken})
+        res.status(200).json({ token: generatedToken })
       } else {
         const user = await User.create({
           firstname: decoded.given_name,
@@ -104,14 +146,14 @@ const authorizeOauth2User = async (req, res) => {
         })
         console.log("logged in")
         const generatedToken = generateJwtToken(user)
-        res.status(200).json({token: generatedToken})
+        res.status(200).json({ token: generatedToken })
       }
-      } else {
-        res.status(401).json({ "error": "Invalid OAuth2 Token" })
-      }
+    } else {
+      res.status(401).json({ "error": "Invalid OAuth2 Token" })
+    }
   } catch (error) {
     console.log(error)
-    res.status(400).json({ error: error }); 
+    res.status(400).json({ error: error });
   }
 }
 
@@ -122,13 +164,13 @@ const authenticateUser = async (req, res) => {
     const user = await User.findOne({
       email: req.body.email,
     })
-    if(user) {
+    if (user) {
       if (user.password != "oAuth2") {
-        if (await bcrypt.compare(req.body.password, user.password)){
+        if (await bcrypt.compare(req.body.password, user.password)) {
           console.log("logged in");
           const token = generateJwtToken(user)
-          res.status(200).json({token: token})
-        } else{
+          res.status(200).json({ token: token })
+        } else {
           res.status(401).json({ error: "Incorrect Password" })
         }
       } else {
@@ -185,7 +227,7 @@ const updateUser = async (req, res) => {
       }
     )
     res.status(200).json(user);
-  } catch(error) {
+  } catch (error) {
     return res.status(400).json({ error: error })
 
   }
@@ -194,6 +236,7 @@ const updateUser = async (req, res) => {
 module.exports = {
   getUsers,
   getUser,
+  getUsersPagination,
   createUser,
   authorizeOauth2User,
   authenticateUser,

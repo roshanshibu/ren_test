@@ -6,6 +6,7 @@ const auth = require("../middleware/auth");
 const {
     getUsers,
     getUser,
+    getUsersPagination,
     createUser,
     authorizeOauth2User,
     authenticateUser,
@@ -74,7 +75,7 @@ const router = express.Router();
  *         description : Error
  */
 //CREATE a user - SIGN UP
-router.post('/', createUser)
+router.put('/', createUser)
 
 /**
  * @swagger
@@ -125,6 +126,9 @@ router.use(auth)
 
 //GET all users
 router.get('/', getUsers)
+
+//Get users with pagination
+router.get('/:page/:limit', getUsersPagination)
 
 //GET a single user profile
 router.get('/profile', getUser)

@@ -9,7 +9,13 @@ const getTransactions = async (req, res) => {
   // const { accountID } = req.params;
   // const transactions = await Transaction.find({ accountID: accountID }).sort({
   //   createdAt: -1,
-  const transactions = await calcTransactions(req.headers.jwt.userId);
+
+  //query filters
+  const type = req.query.type;
+  const date = req.query.date;
+  const description = req.query.description;
+
+  const transactions = await calcTransactions(req.headers.jwt.userId, type, date, description);
 
   let result = [];
 
@@ -40,10 +46,19 @@ const getTransactions = async (req, res) => {
 const getSpecificTransactions = async (req, res) => {
   const year = req.params.year;
   const month = req.params.month;
+
+  //query filters
+  const type = req.query.type;
+  const date = req.query.date;
+  const description = req.query.description;
+
   const specTransactions = await calcspecTransactions(
     req.headers.jwt.userId,
     year,
-    month
+    month,
+    type,
+    date,
+    description
   );
 
   let result = [];
@@ -73,7 +88,7 @@ const getSpecificTransactions = async (req, res) => {
 };
 
 //specific Transaction by year and month
-async function calcspecTransactions(UserID, year, month) {
+async function calcspecTransactions(UserID, year, month, type, date, description) {
   //pipeline for currency
 
   const query = {
@@ -102,15 +117,25 @@ async function calcspecTransactions(UserID, year, month) {
     nextMonth = '01';
     nextYear = (parseInt(year, 10) + 1).toString();
   }
+  const match = {
+    userID: { $eq: UserID },
+    date: {
+      $gte: new Date(`${year}-${month}-01`),
+      $lt: new Date(`${nextYear}-${nextMonth}-01`),
+    },
+  };
+  if (type) {
+    match.type = { $eq: type };
+  }
+  if (date) {
+    match.date = { $eq: date };
+  }
+  if (description) {
+    match.description = { $eq: description };
+  }
   const agg2 = await Transaction.aggregate([
     {
-      $match: {
-        userID: { $eq: UserID },
-        date: {
-          $gte: new Date(`${year}-${month}-01`),
-          $lt: new Date(`${nextYear}-${nextMonth}-01`),
-        },
-      },
+      $match: match
     },
     {
       $addFields: {
@@ -186,7 +211,7 @@ async function calcspecTransactions(UserID, year, month) {
 }
 
 //all Transactions
-async function calcTransactions(UserID) {
+async function calcTransactions(UserID, type, date, description) {
   //pipeline for currency
   const agg1 = await User.aggregate([
     {
@@ -205,8 +230,18 @@ async function calcTransactions(UserID) {
     },
   ]);
   //pipeline for transactions
+  const match = { userID: { $eq: UserID } };
+  if (type) {
+    match.type = { $eq: type };
+  }
+  if (date) {
+    match.date = { $eq: date };
+  }
+  if (description) {
+    match.description = { $eq: description };
+  }
   const agg2 = await Transaction.aggregate([
-    { $match: { userID: { $eq: UserID } } },
+    { $match: match },
     {
       $addFields: {
         categoryID: { $toObjectId: '$categoryID' },
@@ -303,12 +338,38 @@ const getTransaction = async (req, res) => {
   res.status(200).json(transaction);
 };
 
+//GET transactions with pagination
+const getTransactionsPagination = async (req, res) => {
+  const page = parseInt(req.params.page) || 1;
+  const limit = parseInt(req.params.limit) || 10;
+
+  const transactions = await Transaction.find({
+    userID: req.headers.jwt.userId,
+  })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .sort({ createdAt: -1 });
+
+  const totalTransactions = await Transaction.countDocuments({
+    userID: req.headers.jwt.userId,
+  });
+
+  const pagination = {
+    currentPage: page,
+    itemsPerPage: limit,
+    totalPages: Math.ceil(totalTransactions / limit),
+    totalItems: totalTransactions,
+  };
+
+  res.status(200).json({ transactions, pagination });
+};
+
 const checkTransactionCreation = async (req, res) => {
   if (req.body.type == 'Transfer') createTransfer(req, res);
   else createTransaction(req, res);
 };
 
-//POST a new transaction
+//PUT a new transaction
 const createTransaction = async (req, res) => {
   const { accountID, description, amount, date, categoryID, type } = req.body;
   const userID = req.headers.jwt.userId;
@@ -317,18 +378,38 @@ const createTransaction = async (req, res) => {
     return res.status(404).json({ error: 'No such account' });
 
   try {
-    const transaction = await Transaction.create({
+    let transaction = await Transaction.findOne({ //check if transaction with the exact same values already exists. If it does, return existing
+      accountID,
+      userID,
       accountID,
       userID,
       description,
       amount,
       date,
       categoryID,
-      type,
+      type
     });
+    if (!transaction) {
+      transaction = await Transaction.create({
+        accountID,
+        userID,
+        description,
+        amount,
+        date,
+        categoryID,
+        type
+      });
+    }
 
     const account = await Account.findById(accountID);
-    const account_newBalance = +account.balance - +amount;
+
+    var account_newBalance;
+    if (type == "Income" || type == "income") {
+      account_newBalance = +account.balance + +amount;
+    }
+    else {
+      account_newBalance = +account.balance - +amount;
+    }
 
     await Account.findOneAndUpdate(
       { _id: accountID },
@@ -345,10 +426,8 @@ const createTransaction = async (req, res) => {
     res.status(400).json({ error: err.message }); //error messages not working
   }
 };
-
+  //PUT new transaction with type transfer
 const createTransfer = async (req, res) => {
-  //POST
-  //make new transaction with type transfer
   const { accountID, fromAccountID, description, amount, date, type } =
     req.body;
   const userID = req.headers.jwt.userId;
@@ -361,15 +440,26 @@ const createTransfer = async (req, res) => {
     return res.status(400).json({ error: 'No such account' });
 
   try {
-    const transaction = await Transaction.create({
+    let transaction = await Transaction.findOne({ //check if transaction with the exact same values already exists. If it does, return existing
       accountID,
       fromAccountID,
       userID,
       description,
       amount,
       date,
-      type,
+      type
     });
+    if (!transaction) {
+      transaction = await Transaction.create({
+        accountID,
+        fromAccountID,
+        userID,
+        description,
+        amount,
+        date,
+        type
+      });
+    }
 
     //Update balance in specified accounts
     const fromAccount = await Account.findById(fromAccountID);
@@ -537,6 +627,7 @@ module.exports = {
   getSpecificTransactions,
   getTransactions,
   getTransaction,
+  getTransactionsPagination,
   checkTransactionCreation,
   deleteTransaction,
   updateTransaction,

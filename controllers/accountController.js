@@ -4,12 +4,16 @@ const User = require('../models/userModel');
 
 //GET all accounts
 const getAccounts = async (req, res) => {
-  const accounts = await calcAccounts(req.headers.jwt.userId);
+
+  const type = req.query.type;
+  const name = req.query.name;
+
+  const accounts = await calcAccounts(req.headers.jwt.userId, type, name);
 
   res.status(200).json(accounts);
 };
 
-async function calcAccounts(UserID) {
+async function calcAccounts(UserID, type, name) {
   //pipeline for currency
   const agg1 = await User.aggregate([
     {
@@ -27,10 +31,17 @@ async function calcAccounts(UserID) {
     },
   ]);
 
-  //Show all accounts pipeline
+  // Show all accounts pipeline
+  const match = { userID: { $eq: UserID } };
+  if (type) {
+    match.type = { $eq: type };
+  }
+  if (name) {
+    match.name = { $eq: name };
+  }
   const agg2 = await Account.aggregate([
     {
-      $match: { userID: { $eq: UserID } },
+      $match: match,
     },
     {
       $project: {
@@ -66,19 +77,51 @@ const getAccount = async (req, res) => {
   res.status(200).json(account);
 };
 
-//POST a new account
+const getAccountsPagination = async (req, res) => {
+  const page = parseInt(req.params.page) || 1;
+  const limit = parseInt(req.params.limit) || 10;
+
+  const accounts = await Account.find({
+    userID: req.headers.jwt.userId,
+  })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .sort({ createdAt: -1 });
+
+  const totalAccounts = await Account.countDocuments({
+    userID: req.headers.jwt.userId,
+  });
+
+  const pagination = {
+    currentPage: page,
+    itemsPerPage: limit,
+    totalPages: Math.ceil(totalAccounts / limit),
+    totalItems: totalAccounts,
+  };
+
+  res.status(200).json({ accounts, pagination });
+};
+
+//PUT a new account
 const createAccount = async (req, res) => {
   const { name, type, balance, color } = req.body;
   const userID = req.headers.jwt.userId;
 
   try {
-    const account = await Account.create({
+    let account = await Account.findOne({ //Check if account with same name, type and userid already exists
       name,
       type,
-      userID,
-      balance,
-      color,
+      userID
     });
+    if (!account) {
+      account = await Account.create({
+        name,
+        type,
+        userID,
+        balance,
+        color,
+      });
+    }
     res.status(200).json(account);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -142,6 +185,7 @@ const updateAccount = async (req, res) => {
 module.exports = {
   getAccounts,
   getAccount,
+  getAccountsPagination,
   createAccount,
   deleteAccount,
   updateAccount,
