@@ -21,8 +21,8 @@ const getTransactions = async (req, res) => {
   });
 
   //renames "transactions" to date value
-  result = result.map(obj => {
-    if (obj.hasOwnProperty("transactions")) {
+  result = result.map((obj) => {
+    if (obj.hasOwnProperty('transactions')) {
       const { transactions, ...rest } = obj;
       const newObj = { [obj._id]: transactions, ...rest };
       delete newObj._id;
@@ -32,7 +32,7 @@ const getTransactions = async (req, res) => {
   });
 
   //merge objects into one
-  result = Object.assign({}, ...result)
+  result = Object.assign({}, ...result);
 
   res.status(200).json(result);
 };
@@ -56,8 +56,8 @@ const getSpecificTransactions = async (req, res) => {
   });
 
   //renames "transactions" to date value
-  result = result.map(obj => {
-    if (obj.hasOwnProperty("transactions")) {
+  result = result.map((obj) => {
+    if (obj.hasOwnProperty('transactions')) {
       const { transactions, ...rest } = obj;
       const newObj = { [obj._id]: transactions, ...rest };
       delete newObj._id;
@@ -67,7 +67,7 @@ const getSpecificTransactions = async (req, res) => {
   });
 
   //merge objects into one
-  result = Object.assign({}, ...result)
+  result = Object.assign({}, ...result);
 
   res.status(200).json(result);
 };
@@ -96,13 +96,19 @@ async function calcspecTransactions(UserID, year, month) {
     },
   ]);
   //pipeline for transactions
+  let nextMonth = (parseInt(month, 10) + 1).toString().padStart(2, '0');
+  let nextYear = year;
+  if (month === '12') {
+    nextMonth = '01';
+    nextYear = (parseInt(year, 10) + 1).toString();
+  }
   const agg2 = await Transaction.aggregate([
     {
       $match: {
         userID: { $eq: UserID },
         date: {
           $gte: new Date(`${year}-${month}-01`),
-          $lt: new Date(`${year}-${parseInt(month, 10) + 1}-01`),
+          $lt: new Date(`${nextYear}-${nextMonth}-01`),
         },
       },
     },
@@ -307,6 +313,9 @@ const createTransaction = async (req, res) => {
   const { accountID, description, amount, date, categoryID, type } = req.body;
   const userID = req.headers.jwt.userId;
 
+  if (!mongoose.Types.ObjectId.isValid(accountID))
+    return res.status(404).json({ error: 'No such account' });
+
   try {
     const transaction = await Transaction.create({
       accountID,
@@ -413,6 +422,33 @@ const updateTransaction = async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(404).json({ error: 'No such transaction' });
   }
+
+  //if account was changed, check if new account is valid
+  if (req.body.accountID != null) {
+    if (!mongoose.Types.ObjectId.isValid(req.body.accountID))
+      return res.status(404).json({ error: 'No such account' });
+  }
+
+  //calculate amount difference and deduct from bank account if changed
+  if (req.body.amount != null && req.body.accountID == null) {
+    const transaction = await Transaction.findById(id);
+    const account = await Account.findById(transaction.accountID);
+
+    const amountDifference = Math.abs(transaction.amount - req.body.amount); //calculate difference between old and new amount
+
+    if (transaction.amount >= req.body.amount)
+      var newBalance = account.balance + amountDifference;
+    else
+      var newBalance = account.balance - amountDifference;
+
+    await Account.findOneAndUpdate(
+      { _id: transaction.accountID },
+      {
+        balance: newBalance,
+      }
+    );
+  }
+
 
   const transaction = await Transaction.findOneAndUpdate(
     { _id: id, userID: req.headers.jwt.userId },
