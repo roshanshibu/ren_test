@@ -15,7 +15,13 @@ const getTransactions = async (req, res) => {
   const date = req.query.date;
   const description = req.query.description;
 
-  const transactions = await calcTransactions(req.headers.jwt.userId, type, date, description);
+  const transactions = await calcTransactions(
+    req.headers.jwt.userId,
+    type,
+    date,
+    description,
+    req
+  );
 
   let result = [];
 
@@ -58,7 +64,8 @@ const getSpecificTransactions = async (req, res) => {
     month,
     type,
     date,
-    description
+    description,
+    req
   );
 
   let result = [];
@@ -88,7 +95,15 @@ const getSpecificTransactions = async (req, res) => {
 };
 
 //specific Transaction by year and month
-async function calcspecTransactions(UserID, year, month, type, date, description) {
+async function calcspecTransactions(
+  UserID,
+  year,
+  month,
+  type,
+  date,
+  description,
+  req
+) {
   //pipeline for currency
 
   const query = {
@@ -135,7 +150,7 @@ async function calcspecTransactions(UserID, year, month, type, date, description
   }
   const agg2 = await Transaction.aggregate([
     {
-      $match: match
+      $match: match,
     },
     {
       $addFields: {
@@ -177,6 +192,8 @@ async function calcspecTransactions(UserID, year, month, type, date, description
             input: '$transactions',
             as: 'transaction',
             in: {
+              _id: '$$transaction._id',
+              fromAccountID: '$$transaction.fromAccountID',
               description: '$$transaction.description',
               amount: '$$transaction.amount',
               account: {
@@ -205,13 +222,42 @@ async function calcspecTransactions(UserID, year, month, type, date, description
     },
   ]);
 
-  const res = [agg1, agg2];
+  const transactionsWithLinks = agg2.map(element => {
+    const updatedTransactions = element.transactions.map(transaction => {
+      return {
+        ...transaction,
+        links: [
+          {
+            rel: "self",
+            href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`
+          },
+          {
+            rel: "delete",
+            href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+            method: "DELETE"
+          },
+          {
+            rel: "update",
+            href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+            method: "PATCH"
+          }
+        ]
+      };
+    });
+  
+    return {
+      ...element,
+      transactions: updatedTransactions
+    };
+  });
+
+  const res = [agg1, transactionsWithLinks];
 
   return res;
 }
 
 //all Transactions
-async function calcTransactions(UserID, type, date, description) {
+async function calcTransactions(UserID, type, date, description, req) {
   //pipeline for currency
   const agg1 = await User.aggregate([
     {
@@ -285,6 +331,8 @@ async function calcTransactions(UserID, type, date, description) {
             input: '$transactions',
             as: 'transaction',
             in: {
+              _id: '$$transaction._id',
+              fromAccountID: '$$transaction.fromAccountID',
               description: '$$transaction.description',
               amount: '$$transaction.amount',
               account: {
@@ -312,8 +360,36 @@ async function calcTransactions(UserID, type, date, description) {
       },
     },
   ]);
+  const transactionsWithLinks = agg2.map(element => {
+    const updatedTransactions = element.transactions.map(transaction => {
+      return {
+        ...transaction,
+        links: [
+          {
+            rel: "self",
+            href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`
+          },
+          {
+            rel: "delete",
+            href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+            method: "DELETE"
+          },
+          {
+            rel: "update",
+            href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+            method: "PATCH"
+          }
+        ]
+      };
+    });
+  
+    return {
+      ...element,
+      transactions: updatedTransactions
+    };
+  });
 
-  const res = [agg1, agg2];
+  const res = [agg1, transactionsWithLinks];
 
   return res;
 }
@@ -327,13 +403,33 @@ const getTransaction = async (req, res) => {
 
   const UserID = req.headers.jwt.userId;
 
-  const transaction = await Transaction.findById(id);
+  let transaction = await Transaction.findById(id);
   if (!transaction) {
     return res.status(404).json({ error: 'No such transaction' });
   }
 
   if (!transaction.userID == UserID)
     return res.status(404).json({ error: 'No such transaction' });
+
+  transaction = {
+    ...transaction.toObject(),
+    links: [
+      {
+        rel: "self",
+        href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`
+      },
+      {
+        rel: "delete",
+        href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+        method: "DELETE"
+      },
+      {
+        rel: "update",
+        href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+        method: "PATCH"
+      }
+    ]
+  };
 
   res.status(200).json(transaction);
 };
@@ -361,11 +457,33 @@ const getTransactionsPagination = async (req, res) => {
     totalItems: totalTransactions,
   };
 
-  res.status(200).json({ transactions, pagination });
+  const transactionsWithLinks = transactions.map(transaction => {
+    return {
+      ...transaction.toObject(),
+      links: [
+        {
+          rel: "self",
+          href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`
+        },
+        {
+          rel: "delete",
+          href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+          method: "DELETE"
+        },
+        {
+          rel: "update",
+          href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+          method: "PATCH"
+        }
+      ]
+    };
+  });
+
+  res.status(200).json({ transactionsWithLinks, pagination });
 };
 
 const checkTransactionCreation = async (req, res) => {
-  if (req.body.type == 'Transfer') createTransfer(req, res);
+  if (req.body.type == 'Transfer' || req.body.type == 'transfer') createTransfer(req, res);
   else createTransaction(req, res);
 };
 
@@ -378,7 +496,8 @@ const createTransaction = async (req, res) => {
     return res.status(404).json({ error: 'No such account' });
 
   try {
-    let transaction = await Transaction.findOne({ //check if transaction with the exact same values already exists. If it does, return existing
+    let transaction = await Transaction.findOne({
+      //check if transaction with the exact same values already exists. If it does, return existing
       accountID,
       userID,
       accountID,
@@ -387,7 +506,7 @@ const createTransaction = async (req, res) => {
       amount,
       date,
       categoryID,
-      type
+      type,
     });
     if (!transaction) {
       transaction = await Transaction.create({
@@ -397,17 +516,16 @@ const createTransaction = async (req, res) => {
         amount,
         date,
         categoryID,
-        type
+        type,
       });
     }
 
     const account = await Account.findById(accountID);
 
     var account_newBalance;
-    if (type == "Income" || type == "income") {
+    if (type == 'Income' || type == 'income') {
       account_newBalance = +account.balance + +amount;
-    }
-    else {
+    } else {
       account_newBalance = +account.balance - +amount;
     }
 
@@ -421,12 +539,32 @@ const createTransaction = async (req, res) => {
     if (categoryID == null)
       return res.status(400).json({ error: 'categoryID undefined' });
 
+    transaction = {
+      ...transaction.toObject(),
+      links: [
+        {
+          rel: "self",
+          href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`
+        },
+        {
+          rel: "delete",
+          href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+          method: "DELETE"
+        },
+        {
+          rel: "update",
+          href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+          method: "PATCH"
+        }
+      ]
+    };
+
     res.status(200).json(transaction);
   } catch (err) {
     res.status(400).json({ error: err.message }); //error messages not working
   }
 };
-  //PUT new transaction with type transfer
+//PUT new transaction with type transfer
 const createTransfer = async (req, res) => {
   const { accountID, fromAccountID, description, amount, date, type } =
     req.body;
@@ -440,14 +578,15 @@ const createTransfer = async (req, res) => {
     return res.status(400).json({ error: 'No such account' });
 
   try {
-    let transaction = await Transaction.findOne({ //check if transaction with the exact same values already exists. If it does, return existing
+    let transaction = await Transaction.findOne({
+      //check if transaction with the exact same values already exists. If it does, return existing
       accountID,
       fromAccountID,
       userID,
       description,
       amount,
       date,
-      type
+      type,
     });
     if (!transaction) {
       transaction = await Transaction.create({
@@ -457,7 +596,7 @@ const createTransfer = async (req, res) => {
         description,
         amount,
         date,
-        type
+        type,
       });
     }
 
@@ -480,6 +619,26 @@ const createTransfer = async (req, res) => {
         balance: toAccount_newBalance,
       }
     );
+
+    transaction = {
+      ...transaction.toObject(),
+      links: [
+        {
+          rel: "self",
+          href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`
+        },
+        {
+          rel: "delete",
+          href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+          method: "DELETE"
+        },
+        {
+          rel: "update",
+          href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+          method: "PATCH"
+        }
+      ]
+    };
 
     res.status(200).json(transaction);
   } catch (err) {
@@ -519,37 +678,99 @@ const updateTransaction = async (req, res) => {
       return res.status(404).json({ error: 'No such account' });
   }
 
-  //calculate amount difference and deduct from bank account if changed
-  if (req.body.amount != null && req.body.accountID == null) {
-    const transaction = await Transaction.findById(id);
-    const account = await Account.findById(transaction.accountID);
+  //Check if accountID has changed
+  const temptransaction = await Transaction.findById(id);
+  const account = await Account.findById(temptransaction.accountID);
+  const newAccountID = req.body.accountID;
+  const newAccount = await Account.findById(newAccountID);
 
-    const amountDifference = Math.abs(transaction.amount - req.body.amount); //calculate difference between old and new amount
-
-    if (transaction.amount >= req.body.amount)
-      var newBalance = account.balance + amountDifference;
-    else
-      var newBalance = account.balance - amountDifference;
-
+  if (newAccountID && account._id.toString() != newAccountID) {
+    if (temptransaction.type == "expense" || temptransaction.type == "Expense") {
+      var oldAccount_newBalance = account.balance + temptransaction.amount
+      var newAccount_newBalance = +newAccount.balance - +req.body.amount
+    }
+    else if (temptransaction.type == "income" || temptransaction.type == "Income") {
+      var oldAccount_newBalance = account.balance - temptransaction.amount
+      console.log(oldAccount_newBalance)
+      var newAccount_newBalance = +newAccount.balance + +req.body.amount
+      console.log(newAccount_newBalance)
+    }
+    //Update new account balance
     await Account.findOneAndUpdate(
-      { _id: transaction.accountID },
+      { _id: newAccountID },
       {
-        balance: newBalance,
+        balance: newAccount_newBalance,
+      }
+    );
+
+    //Update old account balance
+    await Account.findOneAndUpdate(
+      { _id: account._id.toString() },
+      {
+        balance: oldAccount_newBalance,
       }
     );
   }
+  else {
+    //check if amount has changed
+    if (req.body.amount != temptransaction.amount) {
+      const transaction = await Transaction.findById(id);
+      const account = await Account.findById(transaction.accountID);
 
+      const amountDifference = Math.abs(transaction.amount - req.body.amount); //calculate difference between old and new amount
+      if (temptransaction.type == "expense" || temptransaction.type == "Expense") {
+        if (transaction.amount >= req.body.amount)
+          var newBalance = account.balance + amountDifference;
+        else var newBalance = account.balance - amountDifference;
 
-  const transaction = await Transaction.findOneAndUpdate(
+      }
+      else if (temptransaction.type == "income" || temptransaction.type == "Income") {
+        if (transaction.amount >= req.body.amount)
+          var newBalance = account.balance - amountDifference;
+        else var newBalance = account.balance + amountDifference;
+      }
+
+      await Account.findOneAndUpdate(
+        { _id: transaction.accountID },
+        {
+          balance: newBalance,
+        }
+      );
+    }
+  }
+
+  let transaction = await Transaction.findOneAndUpdate(
     { _id: id, userID: req.headers.jwt.userId },
     {
       ...req.body,
     }
   );
 
+  transaction = await Transaction.findById(id);
+
   if (!transaction) {
     return res.status(400).json({ error: 'No such transaction' });
   }
+
+  transaction = {
+    ...transaction.toObject(),
+    links: [
+      {
+        rel: "self",
+        href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`
+      },
+      {
+        rel: "delete",
+        href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+        method: "DELETE"
+      },
+      {
+        rel: "update",
+        href: `${req.protocol}://${req.get("host")}/api/transactions/${transaction._id}`,
+        method: "PATCH"
+      }
+    ]
+  };
 
   res.status(200).json(transaction);
 };
@@ -632,3 +853,4 @@ module.exports = {
   deleteTransaction,
   updateTransaction,
 };
+

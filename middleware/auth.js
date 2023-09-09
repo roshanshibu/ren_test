@@ -8,12 +8,12 @@ module.exports = async (req, res, next) => {
     try {
       const decoded = jwt_decode(token)
       if (decoded.iss) {
-        console.log("this is from GOOGLE")
+        //console.log("this is from GOOGLE")
         if(await verify(token)){
           next();
         }
       } else {
-        console.log("this is MY JWT")
+        //console.log("this is MY JWT")
         if(await verifyJWT(token)){
           next();
         }

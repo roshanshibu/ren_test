@@ -146,7 +146,17 @@ const authorizeOauth2User = async (req, res) => {
         })
         console.log("logged in")
         const generatedToken = generateJwtToken(user)
-        res.status(200).json({ token: generatedToken })
+        res.status(200).json({ token: generatedToken , links: [
+          {
+            rel: "self",
+            href: `${req.protocol}://${req.get("host")}/api/users/${user._id}`
+          },
+          {
+            rel: "dashboard",
+            href: `${req.protocol}://${req.get("host")}/api/dashboard`,
+            method: "GET"
+          }
+        ] })
       }
     } else {
       res.status(401).json({ "error": "Invalid OAuth2 Token" })
@@ -169,7 +179,17 @@ const authenticateUser = async (req, res) => {
         if (await bcrypt.compare(req.body.password, user.password)) {
           console.log("logged in");
           const token = generateJwtToken(user)
-          res.status(200).json({ token: token })
+          res.status(200).json({ token: token, links: [
+            {
+              rel: "self",
+              href: `${req.protocol}://${req.get("host")}/api/users/${user._id}`
+            },
+            {
+              rel: "dashboard",
+              href: `${req.protocol}://${req.get("host")}/api/dashboard`,
+              method: "GET"
+            }
+          ] })
         } else {
           res.status(401).json({ error: "Incorrect Password" })
         }

@@ -27,6 +27,25 @@ const getDashboard = async (req, res) => {
   if (dashboard_temp[3].length > 0)
     dashboard.top3Categories = dashboard_temp[3];
 
+  dashboard = {
+    ...dashboard,
+    links: [
+      {
+        rel: "self",
+        href: `${req.protocol}://${req.get("host")}/api/dashboard`
+      },
+      {
+        rel: "accounts",
+        href: `${req.protocol}://${req.get("host")}/api/accounts`,
+        method: "GET"
+      },
+      {
+        rel: "transactions",
+        href: `${req.protocol}://${req.get("host")}/api/transactions`,
+        method: "GET"
+      }
+    ]
+  };
   res.status(200).json(dashboard);
 };
 
@@ -66,40 +85,22 @@ async function calcDashboard(UserID) {
     // },
   ]);
 
-  //total income and total expense pipeline
-  const agg2 = await // Aggregation pipeline for total income
-  Transaction.aggregate([
-    {
-      $match: { userID: { $eq: UserID }, type: 'Income' },
-    },
+  //total income and total expense pipeline // Aggregation pipeline for total income
+  const agg2 = await Transaction.aggregate([
     {
       $match: {
-        $expr: {
-          $and: [
-            {
-              $gte: [
-                '$createdAt',
-                new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-              ],
-            },
-            {
-              $lt: [
-                '$createdAt',
-                new Date(
-                  new Date().getFullYear(),
-                  new Date().getMonth() + 1,
-                  1
-                ),
-              ],
-            },
-          ],
+        userID: { $eq: UserID },
+        type: 'Income',
+        date: {
+          $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          $lt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
         },
       },
     },
     {
       $group: {
         _id: null,
-        totalIncome: { $sum: '$amount' },
+        totalIncome: { $sum: { $ifNull: ['$amount', 0] } },
       },
     },
   ]);
@@ -107,29 +108,12 @@ async function calcDashboard(UserID) {
   // Aggregation pipeline for total expenses
   const agg3 = await Transaction.aggregate([
     {
-      $match: { userID: { $eq: UserID }, type: 'Expense' },
-    },
-    {
       $match: {
-        $expr: {
-          $and: [
-            {
-              $gte: [
-                '$createdAt',
-                new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-              ],
-            },
-            {
-              $lt: [
-                '$createdAt',
-                new Date(
-                  new Date().getFullYear(),
-                  new Date().getMonth() + 1,
-                  1
-                ),
-              ],
-            },
-          ],
+        userID: { $eq: UserID },
+        type: 'Expense',
+        date: {
+          $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          $lt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
         },
       },
     },
@@ -147,7 +131,7 @@ async function calcDashboard(UserID) {
       $match: {
         userID: { $eq: UserID },
         type: 'Expense',
-        createdAt: {
+        date: {
           $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
           $lt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
         },

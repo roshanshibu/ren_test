@@ -3,34 +3,43 @@ const mongoose = require('mongoose');
 
 //GET all Categories
 const getCategories = async (req, res) => {
+  const categories = await Category.find({}).sort({ createdAt: -1 });
 
-  const type = req.query.type;
-  const name = req.query.name;
+  const categoriesWithLinks = categories.map(category => {
+    return {
+      ...category.toObject(),
+      links: [
+        {
+          rel: "self",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`
+        },
+        {
+          rel: "delete",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+          method: "DELETE"
+        },
+        {
+          rel: "update",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+          method: "PATCH"
+        }
+      ]
+    };
+  });
 
-  const query = {};
-  query.userID = req.headers.jwt.userId;
-  if (type) query.type = type;
-  if (name) query.name = name;
-
-  const categories = await Category.find(query).sort({ createdAt: -1 });
-
-  res.status(200).json(categories);
+  res.status(200).json(categoriesWithLinks);
 };
 
 const getCategoriesPagination = async (req, res) => {
   const page = parseInt(req.params.page) || 1;
   const limit = parseInt(req.params.limit) || 10;
 
-  const categories = await Category.find({
-    userID: req.headers.jwt.userId,
-  })
+  const categories = await Category.find({})
     .skip((page - 1) * limit)
     .limit(limit)
     .sort({ createdAt: -1 });
 
-  const totalCategories = await Category.countDocuments({
-    userID: req.headers.jwt.userId,
-  });
+  const totalCategories = await Category.countDocuments({});
 
   const pagination = {
     currentPage: page,
@@ -39,16 +48,60 @@ const getCategoriesPagination = async (req, res) => {
     totalItems: totalCategories,
   };
 
-  res.status(200).json({ categories, pagination });
+  const categoriesWithLinks = categories.map(category => {
+    return {
+      ...category.toObject(),
+      links: [
+        {
+          rel: "self",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`
+        },
+        {
+          rel: "delete",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+          method: "DELETE"
+        },
+        {
+          rel: "update",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+          method: "PATCH"
+        }
+      ]
+    };
+  });
+
+  res.status(200).json(categoriesWithLinks, pagination);
 };
 
 //GET Categories by type
 const getCategoriesByType = async (req, res) => {
   const { type } = req.params;
 
-  const categories = await Category.find({type: type});
+  const categories = await Category.find({ type: type });
 
-  res.status(200).json(categories);
+  const categoriesWithLinks = categories.map(category => {
+    return {
+      ...category.toObject(),
+      links: [
+        {
+          rel: "self",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`
+        },
+        {
+          rel: "delete",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+          method: "DELETE"
+        },
+        {
+          rel: "update",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+          method: "PATCH"
+        }
+      ]
+    };
+  });
+
+  res.status(200).json(categoriesWithLinks);
 };
 
 //GET a single Category
@@ -64,37 +117,68 @@ const getCategory = async (req, res) => {
     return res.status(404).json({ error: 'No such Category' });
   }
 
-  if (category.userID != req.headers.jwt.userId)
-    //if category does not belong to the user
-    return res.status(404).json({ error: 'No such Category' });
-
-  res.status(200).json(category);
+  const categoryWithLinks = {
+    ...category.toObject(),
+    links: [
+      {
+        rel: "self",
+        href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`
+      },
+      {
+        rel: "delete",
+        href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+        method: "DELETE"
+      },
+      {
+        rel: "update",
+        href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+        method: "PATCH"
+      }
+    ]
+  };
+  res.status(200).json(categoryWithLinks);
 };
 
 //PUT a new Category
 const createCategory = async (req, res) => {
-  const { type, name, accountID, icon, color } = req.body;
-  const userID = req.headers.jwt.userId;
+  const { type, name, icon, color } = req.body;
   try {
     let category = await Category.findOne({
       name,
-      userID,
     });
     if (!category) {
       category = await Category.create({
         type,
         name,
-        accountID,
-        userID,
         icon,
         color,
       });
     }
-    res.status(200).json(category);
+    const categoryWithLinks = {
+      ...category.toObject(),
+      links: [
+        {
+          rel: "self",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`
+        },
+        {
+          rel: "delete",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+          method: "DELETE"
+        },
+        {
+          rel: "update",
+          href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+          method: "PATCH"
+        }
+      ]
+    };
+    res.status(200).json(categoryWithLinks);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 };
+
 
 //DELETE a Category
 const deleteCategory = async (req, res) => {
@@ -133,7 +217,26 @@ const updateCategory = async (req, res) => {
     return res.status(400).json({ error: 'No such Category' });
   }
 
-  res.status(200).json(category);
+  const categoryWithLinks = {
+    ...category.toObject(),
+    links: [
+      {
+        rel: "self",
+        href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`
+      },
+      {
+        rel: "delete",
+        href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+        method: "DELETE"
+      },
+      {
+        rel: "update",
+        href: `${req.protocol}://${req.get("host")}/api/categories/${category._id}`,
+        method: "PATCH"
+      }
+    ]
+  };
+  res.status(200).json(categoryWithLinks);
 };
 
 module.exports = {
